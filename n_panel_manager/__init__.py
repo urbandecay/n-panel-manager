@@ -277,16 +277,30 @@ class NPM_UL_toolbar_tools(UIList):
         _flt_flag=0,
     ):
         if self.layout_type in {"DEFAULT", "COMPACT"}:
-            row = layout.row(align=True)
-            row.prop(item, "enabled", text="")
-            label_row = row.row(align=True)
-            label_row.active = item.enabled
+            # Give each entry a little more height and keep the checkbox, icon,
+            # and text in their own slots.  A single label with an icon makes
+            # the compact toolbar flyout icons visually run into their names.
+            row = layout.row(align=False)
+            row.scale_y = 1.35
+
+            checkbox = row.row(align=True)
+            checkbox.scale_x = 0.85
+            checkbox.prop(item, "enabled", text="")
+
+            icon_slot = row.row(align=False)
+            icon_slot.scale_x = 1.15
             if item.icon_value:
-                label_row.label(text=item.label, icon_value=item.icon_value)
+                icon_slot.label(text="", icon_value=item.icon_value)
             else:
-                label_row.label(text=item.label, icon="TOOL_SETTINGS")
+                icon_slot.label(text="", icon="TOOL_SETTINGS")
+
+            label_row = row.row(align=False)
+            label_row.active = item.enabled
+            label_row.label(text=item.label)
             if item.group_size > 1:
-                label_row.label(text=f"{item.group_size} tools", icon="TRIA_DOWN")
+                group_hint = row.row(align=False)
+                group_hint.active = item.enabled
+                group_hint.label(text=f"({item.group_size})", icon="TRIA_DOWN")
         else:
             layout.label(text="", icon_value=item.icon_value)
 
@@ -347,7 +361,7 @@ class NPM_PT_toolbar_manager(Panel):
     bl_label = "3D View Toolbar Manager"
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
-    bl_ui_units_x = 28
+    bl_ui_units_x = 34
 
     def draw(self, context):
         layout = self.layout
