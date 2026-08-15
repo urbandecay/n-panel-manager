@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+
+id = "n_panel_manager"
+version = "1.0.0"
+name = "N-Panel Manager: Toolbar Organizer"
+tagline = "Choose and reorder the 3D View toolbar buttons"
+maintainer = "N-Panel Manager contributors"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+# The add-on only changes Blender UI state and requires no external access.
