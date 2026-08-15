@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "n_panel_manager"
-version = "1.0.1"
+version = "1.0.0"
 name = "N-Panel Manager: Toolbar Organizer"
 tagline = "Choose and reorder the 3D View toolbar buttons"
 maintainer = "N-Panel Manager contributors"

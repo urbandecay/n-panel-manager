@@ -20,7 +20,7 @@ that region is Blender's Toolbar; the N-panel is the sidebar on the right.
 
 1. In Blender, open **Edit > Preferences > Get Extensions**.
 2. Open the drop-down menu and choose **Install from Disk**.
-3. Select `n_panel_manager-1.0.1.zip` from the `dist` folder.
+3. Select `n_panel_manager-1.0.0.zip` from the `dist` folder.
 4. Enable the extension if Blender does not enable it automatically.
 5. In a 3D View, press `T` if the Toolbar is hidden, then click the gear icon
    at its top.

@@ -23,7 +23,7 @@ from bl_ui.space_toolsystem_toolbar import VIEW3D_PT_tools_active
 bl_info = {
     "name": "N-Panel Manager: Toolbar Organizer",
     "author": "N-Panel Manager contributors",
-    "version": (1, 0, 1),
+    "version": (1, 0, 0),
     "blender": (4, 2, 0),
     "location": "3D Viewport > Toolbar",
     "description": "Choose and reorder the buttons in the 3D Viewport toolbar",
