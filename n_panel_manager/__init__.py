@@ -281,14 +281,17 @@ class NPM_UL_toolbar_tools(UIList):
             # and text in their own slots.  A single label with an icon makes
             # the compact toolbar flyout icons visually run into their names.
             row = layout.row(align=False)
-            row.scale_y = 1.35
+            row.ui_units_y = 1.35
 
             checkbox = row.row(align=True)
-            checkbox.scale_x = 0.85
+            checkbox.ui_units_x = 1.15
             checkbox.prop(item, "enabled", text="")
 
             icon_slot = row.row(align=False)
-            icon_slot.scale_x = 1.15
+            # Tool icons are larger than normal UI icons. Reserve the space
+            # explicitly; scaling an icon-only label does not reserve enough
+            # width in a UIList row.
+            icon_slot.ui_units_x = 2.2
             if item.icon_value:
                 icon_slot.label(text="", icon_value=item.icon_value)
             else:
@@ -296,7 +299,7 @@ class NPM_UL_toolbar_tools(UIList):
 
             label_row = row.row(align=False)
             label_row.active = item.enabled
-            label_row.label(text=item.label)
+            label_row.label(text=f"  {item.label}")
             if item.group_size > 1:
                 group_hint = row.row(align=False)
                 group_hint.active = item.enabled
