@@ -15,7 +15,7 @@ from bpy.props import (
     IntProperty,
     StringProperty,
 )
-from bpy.types import AddonPreferences, Operator, Panel, PropertyGroup, UIList
+from bpy.types import AddonPreferences, Operator, Panel, PropertyGroup
 from bl_ui.space_toolsystem_common import ToolDef, ToolSelectPanelHelper
 from bl_ui.space_toolsystem_toolbar import VIEW3D_PT_tools_active
 
@@ -33,6 +33,7 @@ bl_info = {
 
 ADDON_ID = __package__ or __name__
 CONFIG_VERSION = 1
+MANAGER_PAGE_SIZE = 10
 
 _syncing_ui = False
 _original_tools_descriptor = None
@@ -261,53 +262,6 @@ class NPM_ToolListItem(PropertyGroup):
     group_size: IntProperty(default=1, options={"HIDDEN"})
 
 
-class NPM_UL_toolbar_tools(UIList):
-    """Checkbox list shown in the manager dialog."""
-
-    def draw_item(
-        self,
-        _context,
-        layout,
-        _data,
-        item,
-        _icon,
-        _active_data,
-        _active_property,
-        _index=0,
-        _flt_flag=0,
-    ):
-        if self.layout_type in {"DEFAULT", "COMPACT"}:
-            # Give each entry a little more height and keep the checkbox, icon,
-            # and text in their own slots.  A single label with an icon makes
-            # the compact toolbar flyout icons visually run into their names.
-            row = layout.row(align=False)
-            row.ui_units_y = 1.35
-
-            checkbox = row.row(align=True)
-            checkbox.ui_units_x = 1.15
-            checkbox.prop(item, "enabled", text="")
-
-            icon_slot = row.row(align=False)
-            # Tool icons are larger than normal UI icons. Reserve the space
-            # explicitly; scaling an icon-only label does not reserve enough
-            # width in a UIList row.
-            icon_slot.ui_units_x = 2.2
-            if item.icon_value:
-                icon_slot.label(text="", icon_value=item.icon_value)
-            else:
-                icon_slot.label(text="", icon="TOOL_SETTINGS")
-
-            label_row = row.row(align=False)
-            label_row.active = item.enabled
-            label_row.label(text=f"  {item.label}")
-            if item.group_size > 1:
-                group_hint = row.row(align=False)
-                group_hint.active = item.enabled
-                group_hint.label(text=f"({item.group_size})", icon="TRIA_DOWN")
-        else:
-            layout.label(text="", icon_value=item.icon_value)
-
-
 def _populate_window_state(context, mode_name: str) -> None:
     global _syncing_ui
     window_manager = context.window_manager
@@ -333,6 +287,7 @@ def _populate_window_state(context, mode_name: str) -> None:
             window_manager.npm_tool_index,
             max(0, len(window_manager.npm_tool_items) - 1),
         )
+        window_manager.npm_list_offset = 0
         window_manager.npm_edit_mode = mode_name
     finally:
         _syncing_ui = False
@@ -375,16 +330,73 @@ class NPM_PT_toolbar_manager(Panel):
         header.label(text=f"{pretty_mode} Mode", icon="WORKSPACE")
         header.label(text="Changes update the toolbar immediately")
 
-        row = layout.row()
-        row.template_list(
-            NPM_UL_toolbar_tools.__name__,
-            "",
-            window_manager,
-            "npm_tool_items",
-            window_manager,
-            "npm_tool_index",
-            rows=min(16, max(8, len(window_manager.npm_tool_items))),
-        )
+        items = window_manager.npm_tool_items
+        max_offset = max(0, len(items) - MANAGER_PAGE_SIZE)
+        offset = min(max(0, window_manager.npm_list_offset), max_offset)
+        page_end = min(len(items), offset + MANAGER_PAGE_SIZE)
+
+        row = layout.row(align=False)
+        list_box = row.box()
+        list_column = list_box.column(align=False)
+
+        for index in range(offset, page_end):
+            item = items[index]
+            item_column = list_column.column(align=False)
+            item_row = item_column.row(align=False)
+            item_row.ui_units_y = 1.6
+
+            checkbox = item_row.row(align=True)
+            checkbox.ui_units_x = 1.3
+            checkbox.prop(item, "enabled", text="")
+
+            # Give the oversized toolbar artwork a dedicated fixed-width
+            # column. Blender does not allow these icon templates to scale
+            # below 1.0, so real row height and spacing are required here.
+            icon_slot = item_row.row(align=False)
+            icon_slot.ui_units_x = 2.5
+            icon_slot.alignment = "CENTER"
+            icon_slot.active = item.enabled
+            if item.icon_value:
+                icon_slot.label(text="", icon_value=item.icon_value)
+            else:
+                icon_slot.label(text="", icon="TOOL_SETTINGS")
+
+            item_row.separator(factor=0.75)
+            select = item_row.operator(
+                NPM_OT_select_toolbar_item.bl_idname,
+                text=item.label,
+                depress=index == window_manager.npm_tool_index,
+            )
+            select.index = index
+
+            if item.group_size > 1:
+                group_hint = item_row.row(align=False)
+                group_hint.ui_units_x = 3.6
+                group_hint.label(text=f"{item.group_size} tools", icon="TRIA_DOWN")
+
+            if index + 1 < page_end:
+                item_column.separator(factor=0.45)
+
+        if len(items) > MANAGER_PAGE_SIZE:
+            list_column.separator(factor=0.4)
+            pager = list_column.row(align=True)
+            previous = pager.row(align=True)
+            previous.enabled = offset > 0
+            op = previous.operator(
+                NPM_OT_page_toolbar_items.bl_idname,
+                text="Previous",
+                icon="TRIA_LEFT",
+            )
+            op.direction = "PREVIOUS"
+            pager.label(text=f"{offset + 1}-{page_end} of {len(items)}")
+            following = pager.row(align=True)
+            following.enabled = page_end < len(items)
+            op = following.operator(
+                NPM_OT_page_toolbar_items.bl_idname,
+                text="Next",
+                icon="TRIA_RIGHT",
+            )
+            op.direction = "NEXT"
 
         controls = row.column(align=True)
         op = controls.operator(NPM_OT_move_toolbar_item.bl_idname, text="", icon="TRIA_UP_BAR")
@@ -411,6 +423,57 @@ class NPM_PT_toolbar_manager(Panel):
             text="Rows marked with a triangle are Blender flyout groups and stay grouped.",
             icon="INFO",
         )
+
+
+def _keep_index_visible(window_manager, index: int) -> None:
+    offset = window_manager.npm_list_offset
+    if index < offset:
+        offset = index
+    elif index >= offset + MANAGER_PAGE_SIZE:
+        offset = index - MANAGER_PAGE_SIZE + 1
+    window_manager.npm_list_offset = min(
+        max(0, offset),
+        max(0, len(window_manager.npm_tool_items) - MANAGER_PAGE_SIZE),
+    )
+
+
+class NPM_OT_select_toolbar_item(Operator):
+    bl_idname = "view3d.npm_select_toolbar_item"
+    bl_label = "Select Toolbar Button"
+    bl_description = "Select this button for the ordering controls"
+    bl_options = {"INTERNAL"}
+
+    index: IntProperty(options={"SKIP_SAVE"})
+
+    def execute(self, context):
+        window_manager = context.window_manager
+        if self.index < 0 or self.index >= len(window_manager.npm_tool_items):
+            return {"CANCELLED"}
+        window_manager.npm_tool_index = self.index
+        _keep_index_visible(window_manager, self.index)
+        return {"FINISHED"}
+
+
+class NPM_OT_page_toolbar_items(Operator):
+    bl_idname = "view3d.npm_page_toolbar_items"
+    bl_label = "Change Toolbar Manager Page"
+    bl_options = {"INTERNAL"}
+
+    direction: EnumProperty(
+        items=(
+            ("PREVIOUS", "Previous", "Show the previous buttons"),
+            ("NEXT", "Next", "Show the next buttons"),
+        )
+    )
+
+    def execute(self, context):
+        window_manager = context.window_manager
+        change = -MANAGER_PAGE_SIZE if self.direction == "PREVIOUS" else MANAGER_PAGE_SIZE
+        window_manager.npm_list_offset = min(
+            max(0, window_manager.npm_list_offset + change),
+            max(0, len(window_manager.npm_tool_items) - MANAGER_PAGE_SIZE),
+        )
+        return {"FINISHED"}
 
 
 class NPM_OT_move_toolbar_item(Operator):
@@ -447,6 +510,7 @@ class NPM_OT_move_toolbar_item(Operator):
         if destination != index:
             items.move(index, destination)
             window_manager.npm_tool_index = destination
+            _keep_index_visible(window_manager, destination)
             _save_window_state(context)
         return {"FINISHED"}
 
@@ -518,9 +582,10 @@ class NPM_AddonPreferences(AddonPreferences):
 
 classes = (
     NPM_ToolListItem,
-    NPM_UL_toolbar_tools,
     NPM_OT_open_toolbar_manager,
     NPM_PT_toolbar_manager,
+    NPM_OT_select_toolbar_item,
+    NPM_OT_page_toolbar_items,
     NPM_OT_move_toolbar_item,
     NPM_OT_set_toolbar_visibility,
     NPM_OT_restore_mode_defaults,
@@ -567,6 +632,9 @@ def register():
     bpy.types.WindowManager.npm_tool_index = IntProperty(
         default=0, options={"SKIP_SAVE"}
     )
+    bpy.types.WindowManager.npm_list_offset = IntProperty(
+        default=0, min=0, options={"SKIP_SAVE"}
+    )
     bpy.types.WindowManager.npm_edit_mode = StringProperty(
         options={"HIDDEN", "SKIP_SAVE"}
     )
@@ -578,6 +646,7 @@ def unregister():
     _restore_toolbar()
 
     del bpy.types.WindowManager.npm_edit_mode
+    del bpy.types.WindowManager.npm_list_offset
     del bpy.types.WindowManager.npm_tool_index
     del bpy.types.WindowManager.npm_tool_items
 
